@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <title>Self Service Order</title>
+</head>
+
+<body>
+
+    <main id="app">
+
+        <section class="items">
+            <div class="test">
+                <div class="cabecalho">
+                    <img src="logotipos.png" class="logo" style="width: 60px; height: auto; margin-left: 5px;">
+                    <h3>Encomende seu perfume via WhatsApp</h3>
+                    <img src="logotipos.png" class="logo" style="width: 60px; height: auto; margin-right: 5px;">
+                </div>
+                <h5>(Prazo de entrega 7 à 14 Dias)</h5>
+                </br>
+                <a href="#" id="doubtsLink">Dúvidas clique aqui!</a>
+                <div class="filltro">
+                    <input type="text" v-model="searchQuery" placeholder="Pesquisar produto" />
+                </div>
+            </div>
+            <div v-for="product in filteredProducts" class="product" @click="toggleActive(product)" :class="{selected: product.active}">
+                <div class="photo">
+                    <img :src="'img/' + product.NOMEIMAGEM">
+                </div>
+                <div class="description">
+                    <span class="name">{{product.PERFUME +' '+ product.TIPO + ' '+product.ML+' ML' +' - '+ product.ABVMARCA}}</span>
+                    <span class="price">$ {{product.REVENDA}}</span>
+                    <div class="quantity-area">
+                        <template v-if="product.active">
+                            <button :disabled="product.quantity<=1" @click.stop="product.quantity--">-</button>
+                            <span class="quantity">{{product.quantity}}</span>
+                            <button @click.stop="product.quantity++">+</button>
+                        </template>
+                    </div>
+                    <button id="msg" @click.stop="redirectToWhatsApp(product)">
+                        <i class="fab fa-whatsapp"></i> Encomendar via WhatsApp
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal HTML -->
+    <div id="customModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3 style="color: red;">AVISO!</h3>
+            <p>Encomendas realizadas somente após o pagamento de um sinal correspondente a 15% do valor do produto.</p>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/vue@3"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+        const app = Vue.createApp({
+            data() {
+                return {
+                    products: [],
+                    searchQuery: ''
+                };
+            },
+            created() {
+                axios.get('https://sheetdb.io/api/v1/h30o44uc4omzr')
+                    .then(response => {
+                        this.products = response.data.map(product => ({
+                            ...product,
+                            quantity: 1,
+                            active: false
+                        }));
+                    })
+                    .catch(error => {
+                        console.error('Ocorreu um erro:', error);
+                    });
+            },
+            computed: {
+                filteredProducts() {
+                    return this.products.filter(product => {
+                        const productName = `${product.PERFUME} ${product.TIPO} - ${product.MARCA}`.toLowerCase();
+                        return productName.includes(this.searchQuery.toLowerCase());
+                    });
+                }
+            },
+            methods: {
+                toggleActive(product) {
+                    product.active = !product.active;
+                },
+                total() {
+                    return this.products.reduce((sum, product) => {
+                        return product.active ? sum + product.quantity * product.price : sum;
+                    }, 0).toFixed(2);
+                },
+                redirectToWhatsApp(product) {
+                    const productInfo = `${product.PERFUME} ${product.TIPO} - ${product.ABVMARCA}`;
+                    const message = `Olá, gostaria de encomendar o seguinte produto:\n${productInfo}\nQuantidade: ${product.quantity}\nValor: $${(product.REVENDA * product.quantity)}`;
+                    const url = `https://wa.me/5511950820257?text=${encodeURIComponent(message)}`;
+                    window.open(url, '_blank');
+                }
+            }
+        });
+
+        app.mount('#app');
+
+        // JavaScript para o modal
+        window.onload = function() {
+            const modal = document.getElementById("customModal");
+            const span = document.getElementsByClassName("close")[0];
+
+            modal.style.display = "block";
+
+            span.onclick = function() {
+                modal.style.display = "none";
+            }
+
+            window.onclick = function(event) {
+                if (event.target == modal) {
+                    modal.style.display = "none";
+                }
+            }
+
+            // Redirecionar para WhatsApp com mensagem específica
+            document.getElementById('doubtsLink').onclick = function() {
+                const message = "Olá, tenho a seguinte dúvida:";
+                const url = `https://wa.me/5511950820257?text=${encodeURIComponent(message)}`;
+                window.open(url, '_blank');
+            };
+        };
+    </script>
+</body>
+
+</html>
