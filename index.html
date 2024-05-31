@@ -3,7 +3,6 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
@@ -23,24 +22,27 @@
                     <img src="logotipos.png" class="logo" style="width: 60px; height: auto; margin-right: 5px;">
                 </div>
                 <h5>(Prazo de entrega 7 à 14 Dias)</h5>
-                </br>
+                <br>
                 <a href="#" id="doubtsLink">Dúvidas clique aqui!</a>
                 <div class="filltro">
                     <input type="text" v-model="searchQuery" placeholder="Pesquisar produto" />
                 </div>
             </div>
-            <div v-for="product in filteredProducts" class="product" @click="toggleActive(product)" :class="{selected: product.active}">
+            <div v-for="product in uniqueFilteredProducts" :key="product.id" class="product" @click="toggleActive(product)" :class="{selected: product.active}">
                 <div class="photo">
                     <img :src="'img/' + product.NOMEIMAGEM">
                 </div>
                 <div class="description">
-                    <span class="name">{{product.PERFUME +' '+ product.TIPO + ' '+product.ML+' ML' +' - '+ product.ABVMARCA}}</span>
-                    <span class="price">$ {{product.REVENDA}}</span>
+                    <span class="name">{{ formatProductName(product) }}</span>
+                    <span class="price">R$ {{ calculateTotalPrice(product) }}</span>
+                    <select v-model="product.selectedML" @change="updatePrice(product)">
+                        <option v-for="ml in product.MLArray" :key="ml" :value="ml">{{ ml }} ML</option>
+                    </select>
                     <div class="quantity-area">
                         <template v-if="product.active">
-                            <button :disabled="product.quantity<=1" @click.stop="product.quantity--">-</button>
-                            <span class="quantity">{{product.quantity}}</span>
-                            <button @click.stop="product.quantity++">+</button>
+                            <button :disabled="product.quantity <= 1" @click.stop="decreaseQuantity(product)">-</button>
+                            <span class="quantity">{{ product.quantity }}</span>
+                            <button @click.stop="increaseQuantity(product)">+</button>
                         </template>
                     </div>
                     <button id="msg" @click.stop="redirectToWhatsApp(product)">
@@ -73,21 +75,48 @@
             created() {
                 axios.get('https://sheetdb.io/api/v1/h30o44uc4omzr')
                     .then(response => {
-                        this.products = response.data.map(product => ({
-                            ...product,
-                            quantity: 1,
-                            active: false
-                        }));
+                        const productMap = new Map();
+
+                        response.data.forEach(product => {
+                            const mlValue = parseInt(product.ML, 10);
+                            const revendaPrice = parseFloat(product.REVENDA.replace('R$', '').replace(',', '.'));
+
+                            if (productMap.has(product.NOMECOMPLETO)) {
+                                const existingProduct = productMap.get(product.NOMECOMPLETO);
+                                existingProduct.MLArray.push(mlValue);
+                                existingProduct.prices[mlValue] = revendaPrice;
+                            } else {
+                                const mlArray = [mlValue];
+                                productMap.set(product.NOMECOMPLETO, {
+                                    ...product,
+                                    quantity: 1,
+                                    active: false,
+                                    selectedML: mlValue,
+                                    MLArray: mlArray,
+                                    prices: {
+                                        [mlValue]: revendaPrice
+                                    }
+                                });
+                            }
+                        });
+
+                        this.products = Array.from(productMap.values());
                     })
                     .catch(error => {
                         console.error('Ocorreu um erro:', error);
                     });
             },
             computed: {
-                filteredProducts() {
+                uniqueFilteredProducts() {
+                    const uniqueNames = new Set();
                     return this.products.filter(product => {
                         const productName = `${product.PERFUME} ${product.TIPO} - ${product.MARCA}`.toLowerCase();
-                        return productName.includes(this.searchQuery.toLowerCase());
+                        const matchesQuery = productName.includes(this.searchQuery.toLowerCase());
+                        if (matchesQuery && !uniqueNames.has(productName)) {
+                            uniqueNames.add(productName);
+                            return true;
+                        }
+                        return false;
                     });
                 }
             },
@@ -97,14 +126,49 @@
                 },
                 total() {
                     return this.products.reduce((sum, product) => {
-                        return product.active ? sum + product.quantity * product.price : sum;
+                        return product.active ? sum + product.quantity * this.calculatePrice(product) : sum;
                     }, 0).toFixed(2);
                 },
                 redirectToWhatsApp(product) {
-                    const productInfo = `${product.PERFUME} ${product.TIPO} - ${product.ABVMARCA}`;
-                    const message = `Olá, gostaria de encomendar o seguinte produto:\n${productInfo}\nQuantidade: ${product.quantity}\nValor: $${(product.REVENDA * product.quantity)}`;
+                    const productInfo = `${this.formatProductName(product)} (${product.selectedML} ML)`;
+                    const totalPrice = this.calculateTotalPrice(product);
+                    const advancePayment = (totalPrice * 0.15).toFixed(2);
+                    const message = `Olá, gostaria de encomendar o seguinte produto:\n${productInfo}\nQuantidade: ${product.quantity}\nValor: R$${totalPrice}\nOBS: ESTOU DE ACORDO EM PAGAR 15% DO VALOR DA COMPRA ANTECIPADO PARA VALIDAR A ENCOMENDA = R$ ${advancePayment}`;
                     const url = `https://wa.me/5511950820257?text=${encodeURIComponent(message)}`;
                     window.open(url, '_blank');
+                },
+                formatProductName(product) {
+                    return `${product.PERFUME} ${product.TIPO} - ${product.MARCA}`;
+                },
+                calculatePrice(product) {
+                    return product.prices[product.selectedML] || 0;
+                },
+                calculateTotalPrice(product) {
+                    return (this.calculatePrice(product) * product.quantity).toFixed(2);
+                },
+                updatePrice(product) {
+                    product.REVENDA = this.calculatePrice(product);
+                    this.$forceUpdate();
+                },
+                increaseQuantity(product) {
+                    product.quantity++;
+                    this.updatePrice(product);
+                },
+                decreaseQuantity(product) {
+                    if (product.quantity > 1) {
+                        product.quantity--;
+                        this.updatePrice(product);
+                    }
+                }
+            },
+            watch: {
+                products: {
+                    handler(newProducts) {
+                        newProducts.forEach(product => {
+                            product.REVENDA = this.calculatePrice(product);
+                        });
+                    },
+                    deep: true
                 }
             }
         });
