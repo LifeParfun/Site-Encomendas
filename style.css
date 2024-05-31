@@ -104,8 +104,14 @@ input{
 .name{
     width: 100%;
 }
-
-
+select{
+    margin-top: 15px;
+    margin-bottom: 10px;
+}
+.quantity-area{
+    margin-bottom: 10px;
+    
+}
 section.items .product {
     border: 1px solid lightgrey;
     margin: 6px;
