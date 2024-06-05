@@ -23,14 +23,14 @@
                 </div>
                 <h5>(Prazo de entrega 7 à 14 Dias)</h5>
                 <br>
-                <a href="#" id="doubtsLink">Dúvidas clique aqui!</a>
+                <a href="#" id="doubtsLink">Dúvidas clique aqui</a>
                 <div class="filltro">
                     <input type="text" v-model="searchQuery" placeholder="Pesquisar produto" />
                 </div>
             </div>
             <div v-for="product in uniqueFilteredProducts" :key="product.id" class="product" @click="toggleActive(product)" :class="{selected: product.active}">
                 <div class="photo">
-                    <img :src="'img/' + product.NOMEIMAGEM">
+                    <img :src="'img/' + product.MARCA +'/'+product.NOMEFOTO">
                 </div>
                 <div class="description">
                     <span class="name">{{ formatProductName(product) }}</span>
@@ -58,7 +58,7 @@
         <div class="modal-content">
             <span class="close">&times;</span>
             <h3 style="color: red;">AVISO!</h3>
-            <p>Encomendas realizadas somente após o pagamento de um sinal correspondente a 15% do valor do produto.</p>
+            <p>Encomendas realizadas somente após o pagamento do sinal correspondente a 15% do valor do produto.</p>
         </div>
     </div>
 
